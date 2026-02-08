@@ -13,7 +13,7 @@ import pandas as pd
 
 from src.market_universe import MarketUniverse
 from src.data_loader import DataLoader
-from strategies.sepa_minervini import SEPAStrategy
+# from strategies.sepa_minervini import SEPAStrategy
 from strategies.weinstein_stage import WeinsteinStrategy
 
 
@@ -133,18 +133,18 @@ def screen_market(market_name: str, strategies: list, months: int = 6):
 def main():
     """메인 실행"""
     print("\n" + "="*80)
-    print("Real Stock Screener - SEPA & Weinstein Test")
+    print("Real Stock Screener - Weinstein Stage Analysis")
+    print("Markets: NASDAQ-100 & S&P 500")
     print("="*80)
     print(f"Run Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # 전략 초기화
+    # 전략 초기화 (Weinstein만 사용)
     strategies = [
-        SEPAStrategy(),
         WeinsteinStrategy()
     ]
     
-    # 테스트할 시장
-    markets = ['NASDAQ100', 'RUSSELL2000']
+    # 테스트할 시장 (NASDAQ & S&P500)
+    markets = ['NASDAQ100', 'SP500']
     
     all_market_results = {}
     
