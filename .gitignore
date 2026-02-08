@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 출력 파일
+output/
+*.xlsx
+*.csv
+*.png
+*.html
+
+# 설정 파일 (예시 파일만 공유)
+config/config.yaml
+
+# 데이터
+data/
+*.parquet
+*.h5
+
+# 테스트
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
