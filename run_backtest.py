@@ -16,6 +16,8 @@ import sys
 # from src.performance import PerformanceAnalyzer
 # from src.visualizer import Visualizer
 
+from src.market_universe import MarketUniverse
+
 
 def load_config(config_path="config/config.yaml"):
     """설정 파일 로드"""
@@ -50,6 +52,37 @@ def run_single_backtest(strategy_name, symbol, config):
         'symbol': symbol,
         'status': 'pending_implementation'
     }
+
+
+def get_symbols(config):
+    """
+    설정에서 스크리닝 대상 종목 리스트 가져오기
+    
+    Returns:
+        종목 코드 리스트
+    """
+    screening_config = config.get('screening', {})
+    
+    # 시장 전체 스크리닝
+    if screening_config.get('use_market', False):
+        market = screening_config.get('market', 'NASDAQ100')
+        print(f"\n📊 시장 스크리닝 모드: {market}")
+        
+        universe = MarketUniverse()
+        symbols = universe.get_universe(market)
+        
+        print(f"✓ {len(symbols)}개 종목 로드 완료")
+        print(f"샘플: {', '.join(symbols[:10])}")
+        
+        return symbols
+    
+    # 개별 종목 리스트
+    else:
+        symbols = screening_config.get('symbols', config.get('symbols', []))
+        print(f"\n📋 개별 종목 모드: {len(symbols)}개")
+        print(f"종목: {', '.join(symbols)}")
+        
+        return symbols
 
 
 def run_comparison(strategies, symbols, config):
@@ -119,20 +152,21 @@ def main():
     Path("output/charts").mkdir(exist_ok=True)
     Path("output/reports").mkdir(exist_ok=True)
     
+    # 종목 리스트 로드
+    symbols = get_symbols(config)
+    
     # 실행 모드 결정
     if args.compare and args.strategies:
         strategies = args.strategies.split(',')
-        symbols = config['symbols']
         results = run_comparison(strategies, symbols, config)
     elif args.all:
         enabled_strategies = [
             name for name, params in config['strategies'].items()
             if params.get('enabled', False)
         ]
-        symbols = config['symbols']
         results = run_comparison(enabled_strategies, symbols, config)
     elif args.strategy:
-        symbol = args.symbol if args.symbol else config['symbols'][0]
+        symbol = args.symbol if args.symbol else symbols[0]
         results = [run_single_backtest(args.strategy, symbol, config)]
     else:
         print("❌ 실행 모드를 선택해주세요. --help 참고")
