@@ -17,15 +17,22 @@
 
 - BB 하단 반등 + RSI 과매도
 
-### 2. 이동평균선 크로스오버
+### 2. SEPA (마크 미너비니) ⭐ NEW
+
+- **트렌드 템플릿**: 50일 > 150일 > 200일 이평선 정배열
+- **VCP 패턴**: 변동성 수축 (거래량 증발)
+- **피벗 돌파**: 거래량 폭증과 함께 고점 돌파
+- **손익비**: 3:1 (손절 7%, 익절 21%)
+
+### 3. 이동평균선 크로스오버
 
 - 골든크로스/데드크로스
 
-### 3. 피보나치 되돌림
+### 4. 피보나치 되돌림
 
 - 주요 되돌림 레벨에서 진입
 
-### 4. 커스텀 전략
+### 5. 커스텀 전략
 
 - 사용자 정의 전략 추가 가능
 
@@ -64,9 +71,13 @@ python run_backtest.py --all
 
 # 특정 전략만 테스트
 python run_backtest.py --strategy bollinger_rsi
+python run_backtest.py --strategy sepa_minervini  # SEPA 전략
 
 # 특정 종목만 테스트
 python run_backtest.py --symbol 005930.KS
+
+# SEPA 전략 단독 테스트
+python test_sepa.py
 ```
 
 ## 📊 결과 확인
