@@ -96,14 +96,31 @@ class TelegramNotifier:
         Returns:
             포맷된 메시지
         """
+        # 전략 한글 매핑
+        strategy_kr = {
+            'Weinstein Stage': '와인스타인 스테이지',
+            'SEPA': 'SEPA (미너비니)',
+            'Aggressive SEPA': '공격적 SEPA 2026',
+            'K-Minervini Pro': '한국형 미너비니 프로',
+            'Bollinger RSI': '볼린저밴드 + RSI'
+        }.get(strategy, strategy)
+        
+        # 시장 한글 매핑
+        market_kr = {
+            'NASDAQ100': '나스닥 100',
+            'SP500': 'S&P 500',
+            'RUSSELL2000': '러셀 2000'
+        }.get(market, market)
+        
         if not buy_signals:
-            message = f"🔍 *{market} - {strategy}*\n\n"
-            message += "❌ No signals found\n"
+            message = f"📊 *{market_kr}*\n"
+            message += f"전략: *{strategy_kr}*\n\n"
+            message += "신호 없음\n"
             return message
         
         # 헤더
-        message = f"🚀 *{market} - {strategy}*\n"
-        message += f"📊 *{len(buy_signals)} Signals Found*\n"
+        message = f"🚀 *{market_kr} - {strategy_kr}*\n"
+        message += f"📈 *{len(buy_signals)}개 매수 신호*\n"
         message += "━━━━━━━━━━━━━━━━━━━━\n\n"
         
         # 상위 결과만 표시
@@ -120,14 +137,14 @@ class TelegramNotifier:
             # 가격 정보
             if isinstance(price, (int, float)) and price > 0:
                 if price < 1000:
-                    message += f"💵 Price: ${price:.2f}\n"
+                    message += f"💵 가격: ${price:.2f}\n"
                 else:
-                    message += f"💵 Price: {price:,.0f}원\n"
+                    message += f"💵 가격: {price:,.0f}원\n"
             
             # 거래량 정보 (있는 경우)
             vol_ratio = signal.get('vol_ratio', signal.get('volume_ratio'))
             if vol_ratio:
-                message += f"📈 Volume: {vol_ratio:.1f}x\n"
+                message += f"📊 거래량: {vol_ratio:.1f}배\n"
             
             # 이유 (있는 경우)
             reason = signal.get('reason')
@@ -140,7 +157,7 @@ class TelegramNotifier:
         
         # 더 많은 결과가 있는 경우
         if len(buy_signals) > max_results:
-            message += f"_...and {len(buy_signals) - max_results} more signals_\n"
+            message += f"_...외 {len(buy_signals) - max_results}개 신호_\n"
         
         return message
     
