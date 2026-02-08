@@ -58,6 +58,19 @@ strategies:
       volume_surge: 1.5            # 거래량 50% 폭증
       volume_dry_up: 0.6           # 거래량 40% 감소 (VCP)
       pivot_lookback: 10           # 피벗 탐지 기간
+  
+  # Weinstein Stage (스탠 와인스타인 스테이지 분석)
+  weinstein_stage:
+    enabled: true
+    params:
+      ma_period: 30                # 30주(또는 30일) 이동평균선
+      ma_slope_period: 5           # 기울기 판단 기간
+      volume_multiplier: 2.0       # 거래량 폭증 배수
+      volume_lookback: 20          # 평균 거래량 계산 기간
+      rs_period: 30                # 상대강도 계산 기간
+      stop_loss: 0.08              # 손절 8% (30주선 하회)
+      take_profit: 0.30            # 익절 30% (Stage 2 목표)
+      use_weekly: true             # 주봉 사용
 
 # 리스크 관리
 risk_management:
