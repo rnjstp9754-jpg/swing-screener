@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from src.data_loader import DataLoader
-from strategies.k_sepa import KSEPAStrategy
+from strategies.k_sepa import KMinerviniProStrategy
 
 
 def test_k_sepa_relaxed():
@@ -61,7 +61,7 @@ def test_k_sepa_relaxed():
     
     # 데이터 로더 & 전략
     loader = DataLoader(verbose=False)
-    strategy = KSEPAStrategy(params=relaxed_params)
+    strategy = KMinerviniProStrategy(params=relaxed_params)
     
     # 결과 저장
     all_signals = []
