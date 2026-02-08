@@ -24,6 +24,7 @@ output/
 
 # 설정 파일 (예시 파일만 공유)
 config/config.yaml
+.env
 
 # 데이터
 data/
