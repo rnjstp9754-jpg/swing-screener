@@ -205,7 +205,7 @@ class WeinsteinStrategy(BaseStrategy):
                     'price': row['Close'],
                     'stop_loss': row['ma30'],  # 30주선이 손절선
                     'take_profit': row['Close'] * (1 + self.params['take_profit']),
-                    'reason': f"🔥 Stage 2A 격발 - 30주선돌파 + 거래량폭증({row['Volume']/row['volume_avg']:.1f}x)",
+                    'reason': f"[Stage 2A Breakout] MA30 breakout + Volume surge ({row['Volume']/row['volume_avg']:.1f}x)",
                     'confidence': self._calculate_confidence(df, idx, current_stage),
                     'metrics': {
                         'stage': current_stage,
@@ -224,7 +224,7 @@ class WeinsteinStrategy(BaseStrategy):
                     'price': row['Close'],
                     'stop_loss': row['ma30'],
                     'take_profit': row['Close'] * (1 + self.params['take_profit']),
-                    'reason': f"🚀 Stage 2 진입 - 30주선({row['ma30']:.0f}) 위 + 우상향",
+                    'reason': f"[Stage 2 Entry] Above MA30({row['ma30']:.0f}) + Rising",
                     'confidence': self._calculate_confidence(df, idx, current_stage),
                     'metrics': {
                         'stage': current_stage,

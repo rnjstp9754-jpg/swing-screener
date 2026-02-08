@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Data Loader
 
@@ -13,8 +14,8 @@ from typing import Optional
 class DataLoader:
     """데이터 로더 클래스"""
     
-    def __init__(self):
-        pass
+    def __init__(self, verbose=False):
+        self.verbose = verbose
     
     def fetch_data(
         self,
@@ -35,7 +36,8 @@ class DataLoader:
         Returns:
             OHLCV 데이터프레임
         """
-        print(f"📊 데이터 다운로드 중: {symbol} ({start_date} ~ {end_date})")
+        if self.verbose:
+            print(f"[DATA] Loading {symbol} ({start_date} ~ {end_date})")
         
         try:
             ticker = yf.Ticker(symbol)
@@ -46,18 +48,21 @@ class DataLoader:
             )
             
             if data.empty:
-                print(f"⚠️  데이터 없음: {symbol}")
+                if self.verbose:
+                    print(f"[WARN] No data: {symbol}")
                 return pd.DataFrame()
             
             # 컬럼 정리
             data = data[['Open', 'High', 'Low', 'Close', 'Volume']]
             data.index.name = 'Date'
             
-            print(f"✓ {len(data)}개 데이터 로드 완료")
+            if self.verbose:
+                print(f"[OK] {len(data)} bars loaded")
             return data
             
         except Exception as e:
-            print(f"❌ 데이터 로드 실패: {symbol} - {e}")
+            if self.verbose:
+                print(f"[ERROR] Failed to load {symbol}: {e}")
             return pd.DataFrame()
     
     def get_latest_data(self, symbol: str, days: int = 365) -> pd.DataFrame:
