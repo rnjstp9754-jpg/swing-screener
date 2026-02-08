@@ -164,15 +164,15 @@ def main():
     chat_id = os.getenv('TELEGRAM_CHAT_ID')
     
     if not bot_token or not chat_id:
-        print("\n❌ .env file not configured!")
+        print("\n[ERROR] .env file not configured!")
         print("\nPlease create .env file with:")
         print("  TELEGRAM_BOT_TOKEN=your_bot_token")
         print("  TELEGRAM_CHAT_ID=your_chat_id")
         print("\nSee docs/telegram_setup.md for details")
         return
     
-    print(f"\n✅ Bot Token: {bot_token[:10]}...{bot_token[-10:]}")
-    print(f"✅ Chat ID: {chat_id}")
+    print(f"\n[OK] Bot Token: {bot_token[:10]}...{bot_token[-10:]}")
+    print(f"[OK] Chat ID: {chat_id}")
     
     # 테스트 실행
     results = []
@@ -188,7 +188,7 @@ def main():
     print("="*80)
     
     for test_name, result in results:
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "[PASS]" if result else "[FAIL]"
         print(f"{status} - {test_name}")
     
     passed = sum(1 for _, r in results if r)

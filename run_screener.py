@@ -170,6 +170,36 @@ def main():
     print("\n" + "="*80)
     print("Screening Complete!")
     print("="*80 + "\n")
+    
+    # 텔레그램 알림 전송
+    try:
+        from src.telegram_notifier import get_notifier
+        
+        notifier = get_notifier()
+        
+        if notifier.enabled:
+            print("\n[Telegram] Sending notifications...")
+            
+            for market, results in all_market_results.items():
+                for strategy_name, signals in results.items():
+                    if signals:
+                        message = notifier.format_screening_results(
+                            market=market,
+                            strategy=strategy_name,
+                            buy_signals=signals,
+                            max_results=10
+                        )
+                        if notifier.send_sync(message):
+                            print(f"[OK] Sent {market} - {strategy_name} ({len(signals)} signals)")
+                        else:
+                            print(f"[FAIL] Failed to send {market} - {strategy_name}")
+            
+            print("[Telegram] Notifications complete!\n")
+        else:
+            print("\n[Telegram] Not configured (skipped)\n")
+    
+    except Exception as e:
+        print(f"\n[ERROR] Telegram notification failed: {e}\n")
 
 
 if __name__ == "__main__":

@@ -178,6 +178,62 @@ def k_weinstein_screener():
     print("Screening Complete!")
     print("="*80 + "\n")
     
+    # 텔레그램 알림 전송
+    try:
+        from src.telegram_notifier import get_notifier
+        from datetime import datetime
+        
+        notifier = get_notifier()
+        
+        if notifier.enabled and (buy_list or sell_list):
+            print("[Telegram] Sending K-Weinstein notifications...")
+            
+            # 시간 정보 추가
+            message = f"🇰🇷 *K-Weinstein Stage Analysis*\n"
+            message += f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            message += "━━━━━━━━━━━━━━━━━━━━\n\n"
+            
+            # 매수 신호
+            message += f"🚀 *Stage 2 Entry ({len(buy_list)} signals)*\n\n"
+            
+            if buy_list:
+                # 거래량 비율로 정렬
+                sorted_buy = sorted(buy_list, key=lambda x: x.get('vol_ratio', 0), reverse=True)
+                
+                for i, stock in enumerate(sorted_buy[:10], 1):
+                    message += f"*{i}. {stock['code']}* {stock['name']}\n"
+                    message += f"💵 {stock['price']:,.0f}원 "
+                    message += f"(EMA120: {stock['ema120']:,.0f})\n"
+                    message += f"📈 Volume: {stock['vol_ratio']:.1f}x\n\n"
+                
+                if len(buy_list) > 10:
+                    message += f"_...and {len(buy_list) - 10} more_\n\n"
+            else:
+                message += "No signals\n\n"
+            
+            # 매도 신호
+            message += f"⚠️ *Stage 4 Entry ({len(sell_list)} signals)*\n\n"
+            
+            if sell_list and len(sell_list) > 0:
+                for i, stock in enumerate(sell_list[:5], 1):
+                    message += f"{i}. {stock['code']} {stock['name']}\n"
+                
+                if len(sell_list) > 5:
+                    message += f"_...and {len(sell_list) - 5} more_\n"
+            
+            if notifier.send_sync(message):
+                print(f"[OK] Sent K-Weinstein results (Buy: {len(buy_list)}, Sell: {len(sell_list)})")
+            else:
+                print("[FAIL] Failed to send K-Weinstein results")
+            
+            print("[Telegram] Notification complete!\n")
+        else:
+            if not notifier.enabled:
+                print("\n[Telegram] Not configured (skipped)\n")
+    
+    except Exception as e:
+        print(f"\n[ERROR] Telegram notification failed: {e}\n")
+    
     return buy_list, sell_list, watch_list
 
 
