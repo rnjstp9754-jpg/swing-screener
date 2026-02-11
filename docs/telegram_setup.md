@@ -22,7 +22,7 @@
 2. 생성한 봇을 그룹에 추가
 3. 브라우저에서 다음 URL 접속:
 
-   ```
+   ```text
    https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
    ```
 

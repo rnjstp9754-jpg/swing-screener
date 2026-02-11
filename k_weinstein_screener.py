@@ -145,26 +145,31 @@ def k_weinstein_screener():
     print("="*80)
     print(f"Total Processed: {success_count}")
     print(f"Errors: {error_count}")
+    
+    # 거래량 비율로 정렬 후 상위 150개로 제한
+    buy_list = sorted(buy_list, key=lambda x: x['vol_ratio'], reverse=True)[:150]
+    sell_list = sell_list[:150]  # 매도는 발견 순서 유지
+    
     print()
     
-    # Stage 2 매수 후보
+    # Stage 2 매수 후보 (최대 150개, 출력은 30개)
     print(f"\n{'█'*20} Stage 2 진입: 매수 후보 ({len(buy_list)}개) {'█'*20}")
     if buy_list:
         print(f"\n{'Code':<10} {'Name':<20} {'Price':<12} {'EMA120':<12} {'Vol Ratio'}")
         print("-" * 80)
-        for stock in sorted(buy_list, key=lambda x: x['vol_ratio'], reverse=True)[:30]:
+        for stock in buy_list[:30]:  # 이미 정렬됨
             print(f"{stock['code']:<10} {stock['name']:<20} "
                   f"{stock['price']:<12,.0f} {stock['ema120']:<12,.0f} "
                   f"{stock['vol_ratio']:.1f}x")
     else:
         print("No Stage 2 breakout signals found.")
     
-    # Stage 4 매도 신호
+    # Stage 4 매도 신호 (최대 150개, 출력은 20개)
     print(f"\n{'█'*20} Stage 4 진입: 매도 신호 ({len(sell_list)}개) {'█'*20}")
     if sell_list:
         print(f"\n{'Code':<10} {'Name':<20} {'Price':<12} {'EMA120':<12}")
         print("-" * 80)
-        for stock in sell_list[:20]:
+        for stock in sell_list[:20]:  # 최대 20개 출력
             print(f"{stock['code']:<10} {stock['name']:<20} "
                   f"{stock['price']:<12,.0f} {stock['ema120']:<12,.0f}")
     else:
@@ -181,7 +186,6 @@ def k_weinstein_screener():
     # 텔레그램 알림 전송
     try:
         from src.telegram_notifier import get_notifier
-        from datetime import datetime
         
         notifier = get_notifier()
         
@@ -197,10 +201,8 @@ def k_weinstein_screener():
             message += f"🚀 *Stage 2 Entry ({len(buy_list)} signals)*\n\n"
             
             if buy_list:
-                # 거래량 비율로 정렬
-                sorted_buy = sorted(buy_list, key=lambda x: x.get('vol_ratio', 0), reverse=True)
-                
-                for i, stock in enumerate(sorted_buy[:10], 1):
+                # 이미 정렬되어 있음 (상위 150개)
+                for i, stock in enumerate(buy_list[:10], 1):
                     message += f"*{i}. {stock['code']}* {stock['name']}\n"
                     message += f"💵 {stock['price']:,.0f}원 "
                     message += f"(EMA120: {stock['ema120']:,.0f})\n"
