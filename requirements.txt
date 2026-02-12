@@ -1,16 +1,16 @@
 # 데이터 수집
 yfinance>=0.2.36
-FinanceDataReader>=0.9.50  # 한국 주식 데이터
+FinanceDataReader>=0.9.50
 pandas>=2.0.0
-numpy>=1.24.0
+numpy<2.0.0  # 중요: 호환성 문제 방지
 
 # 텔레그램 알림
 python-telegram-bot>=20.0
 python-dotenv>=1.0.0
 
 # 기술적 분석
-# ta-lib>=0.4.0  # (선택 사항 - 설치 어려움)
 pandas-ta>=0.3.14b
+scipy  # TA 라이브러리 의존성
 
 # 유틸리티
 python-dateutil>=2.8.0
