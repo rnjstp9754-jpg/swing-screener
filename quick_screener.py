@@ -15,26 +15,32 @@ from src.telegram_notifier import get_notifier
 
 
 def quick_us_screen():
-    """미국 주요 종목만 빠르게 스크리닝"""
+    """미국 시장 스크리닝 - NASDAQ-100 전체 + S&P 500 상위 150개"""
     print("\n[미국 시장] 스크리닝 중...")
     
-    # 주요 종목만 (메모리 절약)
-    symbols = [
-        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA',
-        'AVGO', 'ORCL', 'ADBE', 'NFLX', 'CSCO', 'QCOM', 'AMD',
-        'JPM', 'V', 'MA', 'BAC', 'WFC', 'BRK-B',
-        'UNH', 'JNJ', 'PFE', 'ABBV', 'LLY',
-        'HD', 'MCD', 'SBUX', 'COST', 'NKE',
-        'XOM', 'CVX', 'COP', 'BA', 'CAT'
-    ]
+    from src.market_universe import load_nasdaq100, load_sp500
+    
+    # NASDAQ-100 전체
+    nasdaq_symbols = load_nasdaq100()
+    
+    # S&P 500 상위 150개 (시가총액 기준)
+    sp500_all = load_sp500()
+    sp500_symbols = sp500_all[:150] if len(sp500_all) >= 150 else sp500_all
+    
+    # 합치고 중복 제거
+    all_symbols = list(set(nasdaq_symbols + sp500_symbols))
+    
+    print(f"[미국 시장] NASDAQ-100: {len(nasdaq_symbols)}개, S&P 500: {len(sp500_symbols)}개")
+    print(f"[미국 시장] 총 {len(all_symbols)}개 종목 스크리닝")
     
     loader = DataLoader(verbose=False)
     end_date = datetime.now()
     start_date = end_date - timedelta(days=365)
     
     signals = []
+    processed = 0
     
-    for symbol in symbols:
+    for symbol in all_symbols:
         try:
             data = loader.fetch_data(
                 symbol,
@@ -64,6 +70,11 @@ def quick_us_screen():
                     'ma30': curr_ma30,
                     'vol_ratio': vol_ratio
                 })
+            
+            processed += 1
+            # 진행 상황 출력 (50개마다)
+            if processed % 50 == 0:
+                print(f"[미국 시장] 진행: {processed}/{len(all_symbols)} ({len(signals)}개 신호)")
         
         except Exception as e:
             continue
@@ -73,32 +84,57 @@ def quick_us_screen():
 
 
 def quick_korean_screen():
-    """한국 주요 종목만 빠르게 스크리닝"""
+    """한국 시총 상위 150개 종목 스크리닝"""
     print("\n[한국 시장] 스크리닝 중...")
     
-    # 주요 대형주만
-    symbols = [
-        '005930.KS',  # 삼성전자
-        '000660.KS',  # SK하이닉스
-        '035420.KS',  # NAVER
-        '035720.KS',  # 카카오
-        '051910.KS',  # LG화학
-        '006400.KS',  # 삼성SDI
-        '207940.KS',  # 삼성바이오로직스
-        '068270.KS',  # 셀트리온
-        '005380.KS',  # 현대차
-        '000270.KS',  # 기아
-        '105560.KS',  # KB금융
-        '055550.KS',  # 신한지주
-        '373220.KS',  # LG에너지솔루션
-        '066570.KS',  # LG전자
-        '012330.KS',  # 현대모비스
-        '003670.KS',  # 포스코퓨처엠
-        '028260.KS',  # 삼성물산
-        '009150.KS',  # 삼성전기
-        '017670.KS',  # SK텔레콤
-        '032830.KS',  # 삼성생명
-    ]
+    try:
+        import FinanceDataReader as fdr
+        
+        # KRX 전체 종목 가져오기
+        print("[한국 시장] 종목 리스트 로딩 중...")
+        df_krx = fdr.StockListing('KRX')
+        
+        # KOSPI + KOSDAQ만 선택
+        df_krx = df_krx[df_krx['Market'].isin(['KOSPI', 'KOSDAQ'])]
+        
+        # 시가총액으로 정렬 (상위 150개)
+        df_top = df_krx.nlargest(150, 'Marcap')
+        
+        # 심볼 리스트 및 이름 매핑 생성
+        symbols = []
+        stock_names = {}  # 종목코드 -> 종목명 매핑
+        
+        for _, row in df_top.iterrows():
+            code = row['Code']
+            name = row['Name']
+            market = row['Market']
+            # KOSPI는 .KS, KOSDAQ은 .KQ
+            suffix = '.KS' if market == 'KOSPI' else '.KQ'
+            symbol = f"{code}{suffix}"
+            symbols.append(symbol)
+            stock_names[symbol] = name
+        
+        print(f"[한국 시장] 시총 상위 150개 종목 선택 완료")
+        print(f"           KOSPI: {len(df_top[df_top['Market']=='KOSPI'])}개, KOSDAQ: {len(df_top[df_top['Market']=='KOSDAQ'])}개")
+        
+    except Exception as e:
+        print(f"[한국 시장] 종목 리스트 로딩 실패, 주요 종목만 사용: {e}")
+        # 에러 시 기존 주요 종목 사용
+        symbols = [
+            '005930.KS', '000660.KS', '035420.KS', '035720.KS', '051910.KS',
+            '006400.KS', '207940.KS', '068270.KS', '005380.KS', '000270.KS',
+            '105560.KS', '055550.KS', '373220.KS', '066570.KS', '012330.KS',
+            '003670.KS', '028260.KS', '009150.KS', '017670.KS', '032830.KS'
+        ]
+        stock_names = {
+            '005930.KS': '삼성전자', '000660.KS': 'SK하이닉스', '035420.KS': 'NAVER',
+            '035720.KS': '카카오', '051910.KS': 'LG화학', '006400.KS': '삼성SDI',
+            '207940.KS': '삼성바이오로직스', '068270.KS': '셀트리온', '005380.KS': '현대차',
+            '000270.KS': '기아', '105560.KS': 'KB금융', '055550.KS': '신한지주',
+            '373220.KS': 'LG에너지솔루션', '066570.KS': 'LG전자', '012330.KS': '현대모비스',
+            '003670.KS': '포스코퓨처엠', '028260.KS': '삼성물산', '009150.KS': '삼성전기',
+            '017670.KS': 'SK텔레콤', '032830.KS': '삼성생명'
+        }
     
     loader = DataLoader(verbose=False)
     end_date = datetime.now()
@@ -136,6 +172,7 @@ def quick_korean_screen():
             if is_breakout and is_volume_surge and is_ema_rising:
                 signals.append({
                     'symbol': symbol,
+                    'name': stock_names.get(symbol, 'N/A'),
                     'price': curr_price,
                     'ema120': curr_ema,
                     'vol_ratio': curr_vol / avg_vol
@@ -145,6 +182,7 @@ def quick_korean_screen():
                 if curr_vol > avg_vol * 1.5:
                     signals.append({
                         'symbol': symbol,
+                        'name': stock_names.get(symbol, 'N/A'),
                         'price': curr_price,
                         'ema120': curr_ema,
                         'vol_ratio': curr_vol / avg_vol,
@@ -186,7 +224,8 @@ def send_to_telegram(us_signals, kr_signals):
     if kr_signals:
         for i, s in enumerate(sorted(kr_signals, key=lambda x: x.get('vol_ratio', 0), reverse=True)[:10], 1):
             status = s.get('status', 'Stage 2 진입')
-            message += f"{i}. *{s['symbol']}*\n"
+            name = s.get('name', '')
+            message += f"{i}. *{s['symbol']}* {name}\n"
             message += f"   {s['price']:,.0f}원 | Vol: {s['vol_ratio']:.1f}x\n"
             if status != 'Stage 2 진입':
                 message += f"   _{status}_\n"

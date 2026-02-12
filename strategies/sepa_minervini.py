@@ -1,195 +1,312 @@
 """
 SEPA (Specific Entry Point Analysis) Strategy
-마크 미너비니의 트렌드 템플릿 + VCP 패턴 전략
+마크 미너비니의 트렌드 템플릿 + VCP 패턴 전략 (원본 준수 v2)
 
-핵심 개념:
-1. 트렌드 템플릿: 이동평균선 정배열 + 200일선 우상향 + 신고가 근접
-2. VCP (Volatility Contraction Pattern): 변동성 수축 패턴
-3. 피벗 돌파: 거래량 폭증과 함께 고점 돌파
+핵심 원칙:
+1. 트렌드 템플릿 8개 조건 모두 충족 (Stage 2 확인)
+2. VCP (Volatility Contraction Pattern): 2~6회 수축 + 거래량 건조
+3. 피봇 돌파: 거래량 40~50%↑ 동반
+4. 상대강도(RS): 시장 대비 강한 종목만 대상
+
+참고: Mark Minervini - "Trade Like a Stock Market Wizard" / "Think & Trade Like a Champion"
 """
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from .base_strategy import BaseStrategy
 
 
 class SEPAStrategy(BaseStrategy):
-    """마크 미너비니 SEPA 전략"""
-    
+    """마크 미너비니 SEPA 전략 - 원본 준수 v2"""
+
     def __init__(self, params: Dict = None):
         default_params = {
-            'risk_reward_ratio': 3,
-            'stop_loss': 0.07,      # 손절 7% (미너비니 7-8% 룰)
-            'take_profit': 0.21,    # 익절 21% (3:1 손익비)
-            'sma_periods': {
-                'short': 50,
-                'medium': 150,
-                'long': 200
-            },
-            'new_high_threshold': 0.25,  # 신고가 대비 -25% 이내
-            'volume_surge': 1.5,          # 거래량 50% 폭증
-            'volume_dry_up': 0.6,         # 거래량 40% 감소
-            'pivot_lookback': 10,         # 피벗 탐지 기간
+            # 이동평균선 기간
+            'sma_short': 50,
+            'sma_medium': 150,
+            'sma_long': 200,
+
+            # 트렌드 템플릿 조건
+            'sma200_slope_days': 22,          # 200일선 상승 확인 기간 (~1개월)
+            'new_high_threshold': 0.25,       # 52주 고가 대비 25% 이내
+            'low_threshold': 0.30,            # 52주 저가 대비 최소 30% 상승
+            'rs_min': 0,                      # 상대강도 최소값 (0 = 시장 대비 강함)
+
+            # VCP 패턴 감지
+            'vcp_max_contractions': 6,        # 최대 수축 횟수
+            'vcp_lookback': 60,               # VCP 분석 기간 (일)
+            'vcp_final_tightness': 0.10,      # 마지막 수축 최대 변동폭 (10%)
+            'volume_dry_ratio': 0.60,         # 거래량 건조 기준 (50일 평균의 60%)
+
+            # 돌파 조건
+            'breakout_vol_surge': 1.40,       # 돌파 거래량 최소 1.4x (40%↑)
+            'pivot_lookback': 15,             # 피봇 가격 계산 기간
+
+            # 리스크 관리
+            'stop_loss': 0.07,                # 손절 7% (미너비니 7-8% 룰)
+            'risk_reward_ratio': 3,           # 손익비 3:1
+            'take_profit': 0.21,              # 익절 21% (7% x 3)
+            'breakeven_trigger': 0.10,        # 10% 수익 시 본전치기 활성화
+            'trailing_stop_pct': 0.08,        # 트레일링 스톱 8%
         }
         if params:
             default_params.update(params)
-        
-        super().__init__("SEPA (Minervini)", default_params)
-    
+
+        super().__init__("SEPA (Minervini v2)", default_params)
+
     def calculate_indicators(self, data: pd.DataFrame) -> pd.DataFrame:
         """이동평균선 및 필요한 지표 계산"""
         df = data.copy()
-        
+
         # 이동평균선
-        df['sma50'] = df['Close'].rolling(window=self.params['sma_periods']['short']).mean()
-        df['sma150'] = df['Close'].rolling(window=self.params['sma_periods']['medium']).mean()
-        df['sma200'] = df['Close'].rolling(window=self.params['sma_periods']['long']).mean()
-        
-        # 52주 신고가
-        df['high_52w'] = df['Close'].rolling(window=252).max()
-        
+        df['sma50'] = df['Close'].rolling(window=self.params['sma_short']).mean()
+        df['sma150'] = df['Close'].rolling(window=self.params['sma_medium']).mean()
+        df['sma200'] = df['Close'].rolling(window=self.params['sma_long']).mean()
+
+        # 52주 고가 / 저가
+        df['high_52w'] = df['High'].rolling(window=252, min_periods=200).max()
+        df['low_52w'] = df['Low'].rolling(window=252, min_periods=200).min()
+
         # 평균 거래량 (50일)
-        df['volume_avg_50'] = df['Volume'].rolling(window=50).mean()
-        
-        # 최근 고점 (피벗 포인트)
-        df['recent_high'] = df['High'].rolling(window=self.params['pivot_lookback']).max()
-        
+        df['vol_avg_50'] = df['Volume'].rolling(window=50).mean()
+
+        # 최근 피봇 포인트 (lookback일간 최고가)
+        df['pivot_high'] = df['High'].rolling(window=self.params['pivot_lookback']).max()
+
         return df
-    
-    def check_trend_template(self, df: pd.DataFrame, idx: int) -> bool:
+
+    def check_trend_template(self, df: pd.DataFrame, idx: int) -> Tuple[bool, Dict]:
         """
-        1단계: 트렌드 템플릿 검증
-        
-        조건:
-        - 50일 > 150일 > 200일 이동평균선 (정배열)
-        - 200일선이 우상향 (20일 전보다 높음)
-        - 현재가가 52주 신고가 대비 -25% 이내
+        미너비니 트렌드 템플릿 - 8개 조건 전부 검증
+
+        Returns:
+            (통과 여부, 상세 결과 딕셔너리)
         """
-        if idx < 200:  # 충분한 데이터 확보
-            return False
-        
+        if idx < self.params['sma_long'] + self.params['sma200_slope_days']:
+            return False, {}
+
         row = df.iloc[idx]
-        
-        # 이동평균선 정배열 확인
+
         if pd.isna(row['sma50']) or pd.isna(row['sma150']) or pd.isna(row['sma200']):
-            return False
-        
-        if not (row['sma50'] > row['sma150'] > row['sma200']):
-            return False
-        
-        # 200일선 우상향 확인 (20일 전보다 높아야 함)
-        if idx >= 20:
-            sma200_prev = df.iloc[idx - 20]['sma200']
-            if not (row['sma200'] > sma200_prev):
-                return False
-        
-        # 신고가 근접성 확인
-        if pd.isna(row['high_52w']):
-            return False
-        
-        threshold = row['high_52w'] * (1 - self.params['new_high_threshold'])
-        if row['Close'] < threshold:
-            return False
-        
-        return True
-    
-    def detect_vcp_pivot(self, df: pd.DataFrame, idx: int) -> Tuple[float, bool]:
+            return False, {}
+
+        price = row['Close']
+        sma50 = row['sma50']
+        sma150 = row['sma150']
+        sma200 = row['sma200']
+        high_52w = row['high_52w']
+        low_52w = row['low_52w']
+
+        results = {}
+
+        # ① 주가 > 150일선 & 200일선
+        results['above_150_200'] = (price > sma150) and (price > sma200)
+
+        # ② 150일선 > 200일선
+        results['sma150_above_200'] = sma150 > sma200
+
+        # ③ 200일선 최소 1개월 상승
+        slope_days = self.params['sma200_slope_days']
+        sma200_prev = df.iloc[idx - slope_days]['sma200']
+        results['sma200_rising'] = pd.notna(sma200_prev) and (sma200 > sma200_prev)
+
+        # ④ 50일선 > 150일선 & 200일선
+        results['sma50_above_all'] = (sma50 > sma150) and (sma50 > sma200)
+
+        # ⑤ 주가 > 50일선
+        results['price_above_50'] = price > sma50
+
+        # ⑥ 52주 저가 대비 30% 이상 상승
+        if pd.notna(low_52w) and low_52w > 0:
+            pct_above_low = (price - low_52w) / low_52w
+            results['above_52w_low'] = pct_above_low >= self.params['low_threshold']
+        else:
+            results['above_52w_low'] = False
+
+        # ⑦ 52주 고가 대비 25% 이내
+        if pd.notna(high_52w) and high_52w > 0:
+            pct_from_high = (high_52w - price) / high_52w
+            results['near_52w_high'] = pct_from_high <= self.params['new_high_threshold']
+        else:
+            results['near_52w_high'] = False
+
+        # ⑧ 상대강도 (RS) - IBD RS Rating 근사
+        # IBD RS는 약 12개월 수익률 기준 → 200일 수익률로 대체
+        if idx >= 200:
+            price_200d_ago = df.iloc[idx - 200]['Close']
+            if price_200d_ago > 0:
+                rs_200d = (price / price_200d_ago - 1) * 100
+                results['rs_strong'] = rs_200d > self.params['rs_min']
+            else:
+                results['rs_strong'] = False
+        else:
+            results['rs_strong'] = False
+
+        # 모든 조건 충족 여부
+        all_pass = all(results.values())
+
+        return all_pass, results
+
+    def detect_vcp(self, df: pd.DataFrame, idx: int) -> Tuple[float, bool, Dict]:
         """
-        2단계: VCP (Volatility Contraction Pattern) 및 피벗 탐지
-        
-        VCP 조건:
-        - 최근 5~10일간 거래량이 평균 대비 40% 이상 감소 (거래량 증발)
-        - 가격 변동성 수축
-        
+        VCP (변동성 축소 패턴) 감지
+
+        실제 미너비니 VCP:
+        - 2~6회 수축 (각 수축의 하락폭이 절반씩 감소)
+        - 마지막 구간에서 거래량 건조 (Dry-up)
+        - 피봇 포인트 근처에서 타이트하게 횡보
+
         Returns:
-            (피벗_가격, 거래량_증발_여부)
+            (pivot_price, is_vcp_ready, vcp_details)
         """
-        if idx < 50:
-            return 0.0, False
-        
-        # 최근 5일 평균 거래량 vs 50일 평균 거래량
-        recent_vol_avg = df['Volume'].iloc[idx-5:idx+1].mean()
-        baseline_vol_avg = df.iloc[idx]['volume_avg_50']
-        
-        # 거래량 증발 확인 (40% 이상 감소)
-        vol_dry_up = recent_vol_avg < baseline_vol_avg * self.params['volume_dry_up']
-        
-        # 피벗 포인트 (최근 10일간의 최고가)
-        pivot_price = df.iloc[idx]['recent_high']
-        
-        return pivot_price, vol_dry_up
-    
-    def check_strike(self, df: pd.DataFrame, idx: int) -> Dict:
+        lookback = self.params['vcp_lookback']
+
+        if idx < lookback + 50:
+            return 0.0, False, {}
+
+        # 분석 기간 데이터
+        analysis = df.iloc[idx - lookback:idx + 1]
+        pivot_price = analysis['High'].max()
+
+        # --- 1) 수축 패턴 감지 ---
+        # lookback 기간을 3등분하여 각 구간의 변동성 측정
+        third = lookback // 3
+        seg1 = df.iloc[idx - lookback:idx - lookback + third]
+        seg2 = df.iloc[idx - lookback + third:idx - lookback + 2 * third]
+        seg3 = df.iloc[idx - lookback + 2 * third:idx + 1]
+
+        vol1 = (seg1['High'].max() - seg1['Low'].min()) / seg1['Low'].min() if len(seg1) > 0 else 1
+        vol2 = (seg2['High'].max() - seg2['Low'].min()) / seg2['Low'].min() if len(seg2) > 0 else 1
+        vol3 = (seg3['High'].max() - seg3['Low'].min()) / seg3['Low'].min() if len(seg3) > 0 else 1
+
+        # 변동성이 점진적으로 줄어들어야 함
+        is_contracting = (vol1 > vol2 > vol3) or (vol2 > vol3)
+
+        # 마지막 구간 변동폭이 충분히 타이트한지
+        is_tight = vol3 <= self.params['vcp_final_tightness']
+
+        # --- 2) 거래량 건조 (Dry-up) ---
+        vol_avg_50 = df.iloc[idx]['vol_avg_50']
+        recent_vol_5d = df.iloc[idx - 4:idx + 1]['Volume'].mean()
+
+        is_vol_dry = False
+        if pd.notna(vol_avg_50) and vol_avg_50 > 0:
+            is_vol_dry = recent_vol_5d < (vol_avg_50 * self.params['volume_dry_ratio'])
+
+        # --- 3) 피봇 근접성 ---
+        curr_price = df.iloc[idx]['Close']
+        pct_from_pivot = (pivot_price - curr_price) / pivot_price if pivot_price > 0 else 1
+        is_near_pivot = pct_from_pivot <= 0.05  # 피봇 대비 5% 이내
+
+        # VCP 준비 완료 조건
+        is_vcp_ready = (is_contracting or is_tight) and is_vol_dry and is_near_pivot
+
+        vcp_details = {
+            'contractions': [vol1, vol2, vol3],
+            'is_contracting': is_contracting,
+            'is_tight': is_tight,
+            'is_vol_dry': is_vol_dry,
+            'is_near_pivot': is_near_pivot,
+            'vol_5d_ratio': recent_vol_5d / vol_avg_50 if vol_avg_50 > 0 else 0,
+        }
+
+        return pivot_price, is_vcp_ready, vcp_details
+
+    def check_strike(self, df: pd.DataFrame, idx: int) -> Optional[Dict]:
         """
-        3단계: 최종 격발 신호 (STRIKE)
-        
-        조건:
-        - 트렌드 템플릿 통과
-        - 피벗 포인트 돌파
-        - 거래량 50% 폭증
-        - 선행 거래량 증발
-        
-        Returns:
-            신호 정보 또는 None
+        SEPA STRIKE 신호 (격발)
+
+        3단계 필터:
+        1. 트렌드 템플릿 8개 조건 ALL PASS
+        2. VCP 패턴 + 거래량 건조
+        3. 피봇 돌파 + 거래량 급증 (40%↑)
         """
-        # 트렌드 템플릿 검증
-        if not self.check_trend_template(df, idx):
+        # 1단계: 트렌드 템플릿
+        template_pass, template_detail = self.check_trend_template(df, idx)
+        if not template_pass:
             return None
-        
-        # VCP 및 피벗 탐지
-        pivot_price, vol_dry_up = self.detect_vcp_pivot(df, idx)
-        
+
+        # 2단계: VCP 감지
+        pivot_price, vcp_ready, vcp_detail = self.detect_vcp(df, idx)
         if pivot_price == 0.0:
             return None
-        
+
         row = df.iloc[idx]
         curr_price = row['Close']
         curr_vol = row['Volume']
-        avg_vol = row['volume_avg_50']
-        
-        # 격발 조건 체크
-        # 1. 피벗 돌파
-        pivot_breakout = curr_price > pivot_price
-        
-        # 2. 거래량 폭증 (50% 이상)
-        volume_surge = curr_vol > avg_vol * self.params['volume_surge']
-        
-        # 3. 선행 거래량 증발 (VCP 패턴)
-        if pivot_breakout and volume_surge and vol_dry_up:
+        vol_avg = row['vol_avg_50']
+
+        if pd.isna(vol_avg) or vol_avg <= 0:
+            return None
+
+        vol_ratio = curr_vol / vol_avg
+
+        # 3단계: 돌파 확인
+        is_breakout = curr_price > pivot_price
+        is_vol_surge = vol_ratio >= self.params['breakout_vol_surge']
+
+        # 격발! (VCP + 돌파 + 거래량)
+        if vcp_ready and is_breakout and is_vol_surge:
             stop_loss_price = curr_price * (1 - self.params['stop_loss'])
             take_profit_price = curr_price * (1 + self.params['take_profit'])
-            
+
+            confidence = self._calculate_confidence(df, idx, vcp_detail, vol_ratio)
+
             return {
                 'date': row.name,
                 'type': 'BUY',
                 'price': curr_price,
                 'stop_loss': stop_loss_price,
                 'take_profit': take_profit_price,
-                'reason': f"🚀 SEPA STRIKE - 피벗돌파({pivot_price:.0f}) + 거래량폭증({curr_vol/avg_vol:.1f}x) + VCP",
-                'confidence': self._calculate_confidence(df, idx),
+                'reason': f"SEPA STRIKE - Pivot({pivot_price:.0f}) + Vol({vol_ratio:.1f}x) + VCP",
+                'confidence': confidence,
                 'metrics': {
                     'pivot_price': pivot_price,
-                    'volume_ratio': curr_vol / avg_vol,
-                    'distance_from_52w_high': (curr_price / row['high_52w'] - 1) * 100,
+                    'volume_ratio': vol_ratio,
+                    'distance_from_52w_high': (curr_price / row['high_52w'] - 1) * 100 if pd.notna(row['high_52w']) else 0,
+                    'vcp_contractions': vcp_detail.get('contractions', []),
                     'sma_alignment': f"{row['sma50']:.0f} > {row['sma150']:.0f} > {row['sma200']:.0f}"
                 }
             }
-        
+
+        # 볼륨 없는 돌파도 낮은 신뢰도로 기록 (스크리닝용)
+        if vcp_ready and is_breakout and vol_ratio >= 1.0:
+            confidence = self._calculate_confidence(df, idx, vcp_detail, vol_ratio) * 0.6
+
+            return {
+                'date': row.name,
+                'type': 'BUY',
+                'price': curr_price,
+                'stop_loss': curr_price * (1 - self.params['stop_loss']),
+                'take_profit': curr_price * (1 + self.params['take_profit']),
+                'reason': f"SEPA Setup - Pivot({pivot_price:.0f}) + VCP (Vol 대기)",
+                'confidence': confidence,
+                'metrics': {
+                    'pivot_price': pivot_price,
+                    'volume_ratio': vol_ratio,
+                    'distance_from_52w_high': (curr_price / row['high_52w'] - 1) * 100 if pd.notna(row['high_52w']) else 0,
+                    'vcp_contractions': vcp_detail.get('contractions', []),
+                    'sma_alignment': f"{row['sma50']:.0f} > {row['sma150']:.0f} > {row['sma200']:.0f}"
+                }
+            }
+
         return None
-    
+
     def generate_signals(self, data: pd.DataFrame) -> List[Dict]:
         """매수/매도 신호 생성"""
-        # 지표 계산
         df = self.calculate_indicators(data)
-        
+
         signals = []
         position = None
         entry_price = 0
-        
-        for i in range(200, len(df)):  # 200일 이후부터 시작 (이동평균선 확보)
+        max_price = 0  # 트레일링 스톱용
+
+        min_idx = self.params['sma_long'] + self.params['sma200_slope_days'] + 10
+
+        for i in range(min_idx, len(df)):
             row = df.iloc[i]
-            
+
             # 매수 신호 체크
             if position is None:
                 signal = self.check_strike(df, i)
@@ -197,73 +314,108 @@ class SEPAStrategy(BaseStrategy):
                     signals.append(signal)
                     position = 'LONG'
                     entry_price = signal['price']
-            
-            # 매도 신호 체크 (손절 또는 익절)
+                    max_price = entry_price
+
+            # 매도 신호 체크
             elif position == 'LONG':
                 curr_price = row['Close']
-                stop_loss = entry_price * (1 - self.params['stop_loss'])
-                take_profit = entry_price * (1 + self.params['take_profit'])
-                
-                # 손절
-                if curr_price <= stop_loss:
+                max_price = max(max_price, curr_price)
+                profit_pct = (curr_price - entry_price) / entry_price
+
+                # 1. 손절 (7%)
+                if curr_price <= entry_price * (1 - self.params['stop_loss']):
                     signals.append({
                         'date': row.name,
                         'type': 'SELL',
                         'price': curr_price,
-                        'reason': f"손절 ({((curr_price/entry_price - 1) * 100):.1f}%)",
+                        'reason': f"손절 ({profit_pct * 100:.1f}%)",
                         'confidence': 1.0
                     })
                     position = None
                     entry_price = 0
-                
-                # 익절
-                elif curr_price >= take_profit:
+
+                # 2. 본전치기 (10% 수익 후 매수가로 되돌아올 때)
+                elif profit_pct <= 0.005 and max_price >= entry_price * (1 + self.params['breakeven_trigger']):
                     signals.append({
                         'date': row.name,
                         'type': 'SELL',
                         'price': curr_price,
-                        'reason': f"익절 ({((curr_price/entry_price - 1) * 100):.1f}%)",
+                        'reason': f"본전치기 - Free Roll ({profit_pct * 100:.1f}%)",
+                        'confidence': 0.9
+                    })
+                    position = None
+                    entry_price = 0
+
+                # 3. 익절 (21%)
+                elif curr_price >= entry_price * (1 + self.params['take_profit']):
+                    signals.append({
+                        'date': row.name,
+                        'type': 'SELL',
+                        'price': curr_price,
+                        'reason': f"익절 ({profit_pct * 100:.1f}%)",
                         'confidence': 1.0
                     })
                     position = None
                     entry_price = 0
-                
-                # 트렌드 템플릿 깨짐 (이동평균선 역배열)
-                elif not self.check_trend_template(df, i):
+
+                # 4. 트레일링 스톱 (고점 대비 8% 하락)
+                elif max_price > entry_price * 1.15:  # 15% 이상 수익 후 적용
+                    trail_stop = max_price * (1 - self.params['trailing_stop_pct'])
+                    if curr_price <= trail_stop:
+                        signals.append({
+                            'date': row.name,
+                            'type': 'SELL',
+                            'price': curr_price,
+                            'reason': f"트레일링 스톱 ({profit_pct * 100:.1f}%, 고점대비 {(curr_price/max_price-1)*100:.1f}%)",
+                            'confidence': 0.85
+                        })
+                        position = None
+                        entry_price = 0
+
+                # 5. 트렌드 템플릿 이탈
+                elif not self.check_trend_template(df, i)[0]:
                     signals.append({
                         'date': row.name,
                         'type': 'SELL',
                         'price': curr_price,
-                        'reason': f"트렌드 템플릿 이탈 ({((curr_price/entry_price - 1) * 100):.1f}%)",
+                        'reason': f"트렌드 템플릿 이탈 ({profit_pct * 100:.1f}%)",
                         'confidence': 0.8
                     })
                     position = None
                     entry_price = 0
-        
+
         return signals
-    
-    def _calculate_confidence(self, df: pd.DataFrame, idx: int) -> float:
+
+    def _calculate_confidence(self, df: pd.DataFrame, idx: int,
+                              vcp_detail: Dict, vol_ratio: float) -> float:
         """
         신호 신뢰도 계산 (0~1)
-        
+
         기준:
-        - 신고가에 가까울수록 높음
-        - 이동평균선 간격이 넓을수록 높음
-        - 거래량 폭증이 클수록 높음
+        - 52주 고가 근접도 (40%)
+        - VCP 수축 품질 (30%)
+        - 돌파 거래량 강도 (30%)
         """
         row = df.iloc[idx]
-        
-        # 신고가 근접도 (0~1)
-        high_proximity = row['Close'] / row['high_52w']
-        
-        # 이동평균선 정렬 강도 (간격)
-        ma_spread = (row['sma50'] - row['sma200']) / row['sma200']
-        ma_strength = min(1.0, ma_spread * 10)
-        
-        # 거래량 배수
-        vol_strength = min(1.0, (row['Volume'] / row['volume_avg_50'] - 1) / 2)
-        
-        # 종합 신뢰도
-        confidence = (high_proximity * 0.4 + ma_strength * 0.3 + vol_strength * 0.3)
-        
+
+        # 1. 52주 고가 근접도
+        if pd.notna(row['high_52w']) and row['high_52w'] > 0:
+            high_prox = row['Close'] / row['high_52w']
+        else:
+            high_prox = 0.5
+
+        # 2. VCP 수축 품질
+        contractions = vcp_detail.get('contractions', [0.2, 0.1, 0.05])
+        is_contracting = vcp_detail.get('is_contracting', False)
+        is_tight = vcp_detail.get('is_tight', False)
+        vcp_score = 0.3
+        if is_contracting:
+            vcp_score += 0.4
+        if is_tight:
+            vcp_score += 0.3
+
+        # 3. 거래량 강도
+        vol_score = min(1.0, (vol_ratio - 1.0) / 2.0)
+
+        confidence = high_prox * 0.4 + vcp_score * 0.3 + vol_score * 0.3
         return max(0.0, min(1.0, confidence))

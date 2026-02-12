@@ -1,0 +1,95 @@
+# 백테스트 설정
+backtest:
+  start_date: "2020-01-01"
+  end_date: "2024-12-31"
+  initial_capital: 10000000  # 초기 자본 (원)
+  commission: 0.0015         # 수수료 (0.15%)
+  slippage: 0.001            # 슬리피지 (0.1%)
+
+# 스크리닝 대상 (market 또는 symbols 중 선택)
+screening:
+  # 시장 전체 스크리닝 (우선순위)
+  use_market: true
+  market: "NASDAQ100"  # NASDAQ100, NASDAQ, RUSSELL2000, SP500
+  
+  # 또는 개별 종목 리스트 (use_market: false 시 사용)
+  symbols:
+    # 한국 주식
+    - "005930.KS"  # 삼성전자
+    - "000660.KS"  # SK하이닉스
+    - "035720.KS"  # 카카오
+    
+    # 미국 주식
+    - "AAPL"       # Apple
+    - "MSFT"       # Microsoft
+    - "GOOGL"      # Google
+    - "NVDA"       # NVIDIA
+
+# 전략별 파라미터
+strategies:
+  # 볼린저밴드 + RSI 전략
+  bollinger_rsi:
+    enabled: true
+    params:
+      bb_period: 20
+      bb_std: 2
+      rsi_period: 14
+      rsi_oversold: 30
+      rsi_overbought: 70
+  
+  # 이동평균선 크로스오버
+  ma_crossover:
+    enabled: true
+    params:
+      short_period: 20
+      long_period: 60
+      confirm_candles: 2  # 확정 캔들 수
+  
+  # 피보나치 되돌림
+  fibonacci:
+    enabled: true
+    params:
+      lookback_period: 100
+      entry_levels: [0.382, 0.5, 0.618]  # 진입 레벨
+      exit_level: 0.0  # 목표가 (피보 0.0 = 최고점)
+  
+  # SEPA (마크 미너비니 전략)
+  sepa_minervini:
+    enabled: true
+    params:
+      risk_reward_ratio: 3
+      stop_loss: 0.07              # 손절 7% (미너비니 룰)
+      take_profit: 0.21            # 익절 21% (3:1 손익비)
+      new_high_threshold: 0.25     # 신고가 -25% 이내
+      volume_surge: 1.5            # 거래량 50% 폭증
+      volume_dry_up: 0.6           # 거래량 40% 감소 (VCP)
+      pivot_lookback: 10           # 피벗 탐지 기간
+  
+  # Weinstein Stage (스탠 와인스타인 스테이지 분석)
+  weinstein_stage:
+    enabled: true
+    params:
+      ma_period: 30                # 30주(또는 30일) 이동평균선
+      ma_slope_period: 5           # 기울기 판단 기간
+      volume_multiplier: 2.0       # 거래량 폭증 배수
+      volume_lookback: 20          # 평균 거래량 계산 기간
+      rs_period: 30                # 상대강도 계산 기간
+      stop_loss: 0.08              # 손절 8% (30주선 하회)
+      take_profit: 0.30            # 익절 30% (Stage 2 목표)
+      use_weekly: true             # 주봉 사용
+
+# 리스크 관리
+risk_management:
+  max_position_size: 0.2     # 최대 포지션 크기 (20%)
+  stop_loss: 0.05            # 손절 (-5%)
+  take_profit: 0.15          # 익절 (+15%)
+  trailing_stop: true        # 트레일링 스탑 사용
+  trailing_stop_pct: 0.03    # 트레일링 스탑 비율 (3%)
+
+# 출력 설정
+output:
+  save_trades: true          # 개별 거래 저장
+  save_equity_curve: true    # 자산 곡선 저장
+  generate_charts: true      # 차트 생성
+  generate_report: true      # HTML 리포트 생성
+  verbose: true              # 상세 로그 출력

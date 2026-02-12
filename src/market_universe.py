@@ -2,7 +2,7 @@
 """
 Market Universe Loader
 
-나스닥, 러셀2000 등 주요 지수 구성 종목 리스트를 가져오는 모듈
+나스닥, S&P500 등 주요 지수 구성 종목 리스트를 가져오는 모듈
 """
 
 import pandas as pd
@@ -20,7 +20,7 @@ class MarketUniverse:
     
     def get_nasdaq_100(self) -> List[str]:
         """
-        나스닥 100 종목 리스트
+        나스닥 100 종목 리스트 (실제 100개)
         
         Returns:
             종목 코드 리스트
@@ -30,23 +30,37 @@ class MarketUniverse:
         
         print("[NASDAQ-100] Loading...")
         
-        # 나스닥 100 주요 종목들 (직접 정의)
         nasdaq_100 = [
-            # Technology
+            # Mega Cap Tech
             'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'META', 'NVDA', 'TSLA',
             'AVGO', 'ADBE', 'CSCO', 'NFLX', 'INTC', 'AMD', 'QCOM', 'TXN',
             'INTU', 'AMAT', 'ADI', 'LRCX', 'KLAC', 'SNPS', 'CDNS', 'MRVL',
             'ASML', 'PANW', 'CRWD', 'WDAY', 'TEAM', 'NOW', 'DDOG', 'ZS',
-            
-            # Consumer
-            'COST', 'SBUX', 'BKNG', 'MAR', 'ABNB', 'DASH' 'MDB', 'MELI',
-            
-            # Healthcare/Biotech
-            'AMGN', 'GILD', 'REGN', 'VRTX', 'BIIB', 'MRNA', 'ILMN',
-            
-            # Other
-            'PEP', 'ADP', 'ISRG', 'MDLZ', 'MNST', 'CTAS', 'PAYX', 'PCAR'
+
+            # Software / Cloud
+            'ORCL', 'CRM', 'ADSK', 'FTNT', 'SPLK', 'ANSS', 'CPRT', 'MCHP',
+            'ON', 'GFS', 'SMCI', 'ARM', 'MDB', 'DASH',
+
+            # Consumer / Internet
+            'COST', 'SBUX', 'BKNG', 'MAR', 'ABNB', 'MELI', 'PDD', 'JD',
+            'PYPL', 'AEP', 'EXC', 'XEL', 'LULU', 'ROST',
+
+            # Healthcare / Biotech
+            'AMGN', 'GILD', 'REGN', 'VRTX', 'BIIB', 'MRNA', 'ILMN', 'DXCM',
+            'IDXX', 'ALGN',
+
+            # Industrial / Other
+            'PEP', 'ADP', 'ISRG', 'MDLZ', 'MNST', 'CTAS', 'PAYX', 'PCAR',
+            'ODFL', 'FAST', 'CSX', 'HON', 'GEHC', 'VRSK',
+            'CEG', 'AZN', 'CCEP', 'TTWO', 'EA', 'WBD',
+            'KHC', 'KDP', 'DLTR', 'BKR', 'FANG',
+
+            # Communications
+            'CMCSA', 'TMUS', 'CHTR', 'WBA',
         ]
+
+        # 중복 제거
+        nasdaq_100 = list(dict.fromkeys(nasdaq_100))
         
         self.cache['NASDAQ100'] = nasdaq_100
         print(f"[OK] {len(nasdaq_100)} symbols loaded")
@@ -69,14 +83,14 @@ class MarketUniverse:
         nasdaq = self.get_nasdaq_100() + [
             # 중형주
             'DOCU', 'OKTA', 'NET', 'SNOW', 'PLTR', 'RBLX', 'U', 'COIN',
-            'HOOD', 'RIVN', 'LCID', 'UPST', 'AFRM', 'SQ', 'PYPL',
+            'HOOD', 'RIVN', 'LCID', 'UPST', 'AFRM', 'SQ',
             
             # 소형주
             'FUBO', 'WISH', 'OPEN', 'CPNG', 'GRAB', 'SOFI'
         ]
         
-        # 중복 제거
-        nasdaq = list(set(nasdaq))
+        # 중복 제거 (순서 보존)
+        nasdaq = list(dict.fromkeys(nasdaq))
         
         self.cache['NASDAQ'] = nasdaq
         print(f"[OK] {len(nasdaq)} symbols loaded")
@@ -85,44 +99,30 @@ class MarketUniverse:
     
     def get_russell_2000(self) -> List[str]:
         """
-        러셀 2000 주요 종목 (소형주)
-        
-        실제 2000개 전체를 가져오기는 어려우므로 주요 종목 샘플
-        
-        Returns:
-            종목 코드 리스트
+        러셀 2000 주요 종목 (소형주 샘플)
         """
         if 'RUSSELL2000' in self.cache:
             return self.cache['RUSSELL2000']
         
         print("[Russell 2000] Loading...")
         
-        # 러셀 2000 주요 소형주 샘플
         russell_2000 = [
             # Energy
             'RIG', 'SM', 'PTEN', 'NE', 'MTDR',
-            
             # Financials
             'CBSH', 'WTFC', 'FFIN', 'UMBF', 'CATY',
-            
             # Healthcare
             'PDCO', 'PTGX', 'KRYS', 'CRVL', 'AMED',
-            
             # Technology
             'CWAN', 'AGYS', 'CALX', 'COHU', 'DIOD',
-            
             # Consumer
             'CAKE', 'TXRH', 'WING', 'BLMN', 'DNUT',
-            
             # Industrials
             'AGCO', 'ASTE', 'ATKR', 'AIT', 'AIMC',
-            
             # Materials
             'CENX', 'ARCH', 'BTU', 'CEIX', 'HCC',
-            
             # Real Estate
             'CUBE', 'ELS', 'SUI', 'REXR', 'STAG',
-            
             # Utilities
             'AVA', 'NWE', 'NWN', 'SJW', 'YORW'
         ]
@@ -135,48 +135,63 @@ class MarketUniverse:
     
     def get_sp500(self) -> List[str]:
         """
-        S&P 500 주요 종목
-        
-        Returns:
-            종목 코드 리스트
+        S&P 500 주요 종목 (시가총액 상위 약 150개)
         """
         if 'SP500' in self.cache:
             return self.cache['SP500']
         
         print("[S&P 500] Loading...")
         
-        # S&P 500 주요 종목
         sp500 = [
-            # Mega Cap
+            # Mega Cap (Top 10)
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
-            
+            'AVGO', 'LLY',
+
             # Large Cap Tech
-            'AVGO', 'ORCL', 'ADBE', 'CRM', 'CSCO', 'ACN', 'NFLX', 'AMD',
-            
+            'ORCL', 'ADBE', 'CRM', 'CSCO', 'ACN', 'NFLX', 'AMD', 'QCOM',
+            'TXN', 'INTC', 'IBM', 'NOW', 'INTU', 'AMAT', 'ADI', 'LRCX',
+
             # Financials
             'JPM', 'V', 'MA', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'C', 'SCHW',
-            
+            'AXP', 'MMC', 'CB', 'PGR', 'ICE', 'CME', 'AON', 'MET', 'AIG',
+            'TFC', 'USB',
+
             # Healthcare
-            'UNH', 'JNJ', 'LLY', 'ABBV', 'MRK', 'TMO', 'ABT', 'PFE', 'DHR',
-            
-            # Consumer
-            'AMZN', 'HD', 'MCD', 'NKE', 'SBUX', 'TGT', 'LOW', 'TJX',
-            
+            'UNH', 'JNJ', 'ABBV', 'MRK', 'TMO', 'ABT', 'PFE', 'DHR',
+            'BMY', 'AMGN', 'GILD', 'ISRG', 'SYK', 'ELV',
+            'MDT', 'CI', 'REGN', 'VRTX', 'BSX',
+
+            # Consumer Staples
+            'PG', 'KO', 'PEP', 'COST', 'WMT', 'PM', 'MO', 'CL', 'MDLZ',
+            'GIS', 'KHC', 'K', 'HSY', 'STZ',
+
+            # Consumer Discretionary
+            'HD', 'MCD', 'NKE', 'SBUX', 'TGT', 'LOW', 'TJX', 'ROST',
+            'BKNG', 'CMG', 'MAR', 'HLT', 'F', 'GM', 'ORLY', 'AZO',
+
             # Energy
-            'XOM', 'CVX', 'COP', 'SLB', 'MPC', 'PSX',
-            
+            'XOM', 'CVX', 'COP', 'SLB', 'MPC', 'PSX', 'VLO', 'EOG',
+            'OXY', 'HAL', 'DVN', 'FANG',
+
             # Industrials
             'BA', 'HON', 'UPS', 'CAT', 'RTX', 'DE', 'LMT', 'GE',
-            
+            'UNP', 'FDX', 'WM', 'ETN', 'ITW', 'EMR', 'NOC', 'GD',
+
             # Communication
-            'GOOGL', 'META', 'NFLX', 'DIS', 'CMCSA', 'T', 'VZ',
-            
+            'DIS', 'CMCSA', 'T', 'VZ', 'TMUS', 'CHTR', 'EA', 'TTWO',
+
             # Materials
-            'LIN', 'APD', 'SHW', 'FCX', 'NEM', 'DOW'
+            'LIN', 'APD', 'SHW', 'FCX', 'NEM', 'DOW', 'ECL', 'DD',
+
+            # Real Estate
+            'PLD', 'AMT', 'CCI', 'EQIX', 'SPG', 'O',
+
+            # Utilities
+            'NEE', 'DUK', 'SO', 'D', 'AEP', 'EXC', 'SRE',
         ]
         
-        # 중복 제거
-        sp500 = list(set(sp500))
+        # 중복 제거 (순서 보존)
+        sp500 = list(dict.fromkeys(sp500))
         
         self.cache['SP500'] = sp500
         print(f"[OK] {len(sp500)} symbols loaded")
@@ -184,15 +199,7 @@ class MarketUniverse:
         return sp500
     
     def get_universe(self, market: str) -> List[str]:
-        """
-        지정된 시장의 종목 리스트 반환
-        
-        Args:
-            market: 'NASDAQ100', 'NASDAQ', 'RUSSELL2000', 'SP500'
-        
-        Returns:
-            종목 코드 리스트
-        """
+        """지정된 시장의 종목 리스트 반환"""
         market = market.upper()
         
         if market == 'NASDAQ100':
@@ -207,15 +214,7 @@ class MarketUniverse:
             raise ValueError(f"Unsupported market: {market}")
     
     def get_market_stats(self, market: str) -> Dict:
-        """
-        시장 통계 정보
-        
-        Args:
-            market: 시장 이름
-        
-        Returns:
-            통계 정보 딕셔너리
-        """
+        """시장 통계 정보"""
         symbols = self.get_universe(market)
         
         return {
@@ -223,6 +222,31 @@ class MarketUniverse:
             'total_symbols': len(symbols),
             'sample_symbols': symbols[:5]
         }
+
+
+# Helper functions for quick access
+def load_nasdaq100():
+    """NASDAQ-100 종목 리스트 반환"""
+    universe = MarketUniverse()
+    return universe.get_nasdaq_100()
+
+
+def load_sp500():
+    """S&P 500 종목 리스트 반환"""
+    universe = MarketUniverse()
+    return universe.get_sp500()
+
+
+def load_nasdaq_composite():
+    """NASDAQ 종합 지수 종목 리스트 반환"""
+    universe = MarketUniverse()
+    return universe.get_nasdaq_composite()
+
+
+def load_russell2000():
+    """Russell 2000 종목 리스트 반환"""
+    universe = MarketUniverse()
+    return universe.get_russell_2000()
 
 
 def main():

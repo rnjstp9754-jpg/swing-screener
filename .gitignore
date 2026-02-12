@@ -1,41 +1,24 @@
+# 환경 변수 및 비밀키
+.env
+.env.local
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
+
+# 가상 환경
 venv/
 env/
-ENV/
-.venv
+.venv/
+
+# 결과 파일 (너무 많이 쌓임)
+results/*.csv
+brain/
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# 출력 파일
-output/
-*.xlsx
-*.csv
-*.png
-*.html
-
-# 설정 파일 (예시 파일만 공유)
-config/config.yaml
-.env
-
-# 데이터
-data/
-*.parquet
-*.h5
-
-# 테스트
-.pytest_cache/
-.coverage
-htmlcov/
-
-# OS
-.DS_Store
-Thumbs.db
+# 로그
+*.log

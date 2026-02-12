@@ -54,28 +54,62 @@ class TelegramNotifier:
             print(f"[ERROR] Failed to send Telegram message: {e}")
             return False
     
+    async def _send_multiple(self, messages: list, parse_mode: str = 'Markdown'):
+        """여러 메시지를 하나의 이벤트 루프에서 순차 전송"""
+        import asyncio as aio
+        results = []
+        for msg in messages:
+            result = await self.send_message(msg, parse_mode)
+            results.append(result)
+            await aio.sleep(0.5)  # 텔레그램 rate limit 방지 (0.5초 간격)
+        return results
+    
     def send_sync(self, message: str, parse_mode: str = 'Markdown'):
         """
         동기 방식 메시지 전송 (일반 스크립트에서 사용)
-        
-        Args:
-            message: 전송할 메시지
-            parse_mode: 파싱 모드
         """
         if not self.enabled:
             print("[SKIP] Telegram not configured")
             return False
         
         try:
-            # 이벤트 루프 생성 및 실행
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            result = loop.run_until_complete(self.send_message(message, parse_mode))
-            loop.close()
+            try:
+                result = loop.run_until_complete(self.send_message(message, parse_mode))
+            finally:
+                loop.close()
             return result
         except Exception as e:
             print(f"[ERROR] Failed to send Telegram message: {e}")
             return False
+    
+    def send_multiple_sync(self, messages: list, parse_mode: str = 'Markdown'):
+        """
+        여러 메시지를 동기 방식으로 한 번에 전송 (이벤트 루프 재사용)
+        
+        Args:
+            messages: 전송할 메시지 리스트
+            parse_mode: 파싱 모드
+        
+        Returns:
+            성공한 메시지 수
+        """
+        if not self.enabled:
+            print("[SKIP] Telegram not configured")
+            return 0
+        
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                results = loop.run_until_complete(self._send_multiple(messages, parse_mode))
+            finally:
+                loop.close()
+            return sum(1 for r in results if r)
+        except Exception as e:
+            print(f"[ERROR] Failed to send Telegram messages: {e}")
+            return 0
     
     def format_screening_results(
         self,
