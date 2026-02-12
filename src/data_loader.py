@@ -16,13 +16,9 @@ class DataLoader:
     
     def __init__(self, verbose=False):
         self.verbose = verbose
-        # 타임아웃 설정을 위한 세션 생성
-        import requests
-        self.session = requests.Session()
-        # 10초 타임아웃 설정
-        self.session.request = lambda method, url, **kwargs: requests.Session.request(
-            self.session, method, url, **{**kwargs, "timeout": 10}
-        )
+        # 전역 타임아웃 설정 (15초)
+        import socket
+        socket.setdefaulttimeout(15)
     
     def fetch_data(
         self,
@@ -32,14 +28,14 @@ class DataLoader:
         interval: str = "1d"
     ) -> pd.DataFrame:
         """
-        주식 데이터 가져오기 (타임아웃 적용)
+        주식 데이터 가져오기 (전역 타임아웃 적용)
         """
         if self.verbose:
             print(f"[DATA] Loading {symbol} ({start_date} ~ {end_date})")
         
         try:
-            # 세션 주입하여 타임아웃 적용
-            ticker = yf.Ticker(symbol, session=self.session)
+            # yfinance 호환성을 위해 기본 세션 사용
+            ticker = yf.Ticker(symbol)
             data = ticker.history(
                 start=start_date,
                 end=end_date,
